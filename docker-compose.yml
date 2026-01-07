@@ -10,7 +10,7 @@ services:
       POSTGRES_USER: taskwatch_user
       POSTGRES_PASSWORD: taskwatch_password
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -19,6 +19,27 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # Prometheus pour la collecte de métriques
+  prometheus:
+    image: prom/prometheus
+    container_name: taskwatch-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - backend
+      - postgres
+
+  # Grafana pour la visualisation des métriques
+  grafana:
+    image: grafana/grafana
+    container_name: taskwatch-grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
 
   # Backend API
   backend:
@@ -52,6 +73,21 @@ services:
       - backend
     environment:
       VITE_API_URL: http://localhost:3000
+
+  # cAdvisor pour exporter les métriques Docker
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: taskwatch-cadvisor
+    ports:
+      - "9323:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    depends_on:
+      - backend
+      - postgres
 
 volumes:
   postgres_data:
